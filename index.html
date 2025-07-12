@@ -1,30 +1,48 @@
-
+<!-- Acesta este un schelet pentru jocul Spyfall cu lobby, admin panel si cronometru -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Spyfall Game</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    #game, #player-view { display: none; }
-    textarea { width: 100%; height: 200px; }
-    button { padding: 10px 20px; font-size: 16px; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: auto; }
     .hidden { display: none; }
+    #playerList li { margin: 4px 0; }
+    button { padding: 8px 16px; font-size: 16px; }
+    .timer { font-size: 24px; font-weight: bold; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>Spyfall Game</h1>
+  <h1>Spyfall Online</h1>
 
-  <div id="join">
+  <!-- LOBBY pentru jucatori -->
+  <div id="joinSection">
     <p>Enter your name to join the game:</p>
     <input type="text" id="playerName" placeholder="Your name" />
     <button onclick="joinGame()">Join</button>
   </div>
 
-  <div id="game">
+  <!-- LOBBY Waiting -->
+  <div id="lobbySection" class="hidden">
+    <h3>Waiting for game to start...</h3>
+    <p>Jucatori inscrisi:</p>
+    <ul id="playerList"></ul>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="adminPanel" class="hidden">
+    <h2>Admin Panel</h2>
+    <p>Jucatori conectati:</p>
+    <ul id="adminPlayerList"></ul>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+
+  <!-- JOC activ -->
+  <div id="gameSection" class="hidden">
     <h2>Game Started!</h2>
     <p id="yourRole"></p>
-    <h3>All Possible Locations:</h3>
+    <div class="timer">Timp ramas: <span id="timer">10:00</span></div>
+    <h3>Locatii posibile:</h3>
     <ul id="locationList"></ul>
   </div>
 
@@ -33,42 +51,64 @@
 
     let players = [];
     let assignments = {};
+    let gameStarted = false;
     let location = "";
     let spy = "";
+    let isAdmin = false;
 
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-      return array;
+    if (!localStorage.getItem("admin")) {
+      localStorage.setItem("admin", "false");
+    }
+
+    function updatePlayerLists() {
+      const list = document.getElementById("playerList");
+      const adminList = document.getElementById("adminPlayerList");
+      list.innerHTML = "";
+      adminList.innerHTML = "";
+      players.forEach(p => {
+        const li = document.createElement("li");
+        li.innerText = p;
+        list.appendChild(li);
+
+        const li2 = document.createElement("li");
+        li2.innerText = p;
+        adminList.appendChild(li2);
+      });
     }
 
     window.joinGame = function() {
       const name = document.getElementById("playerName").value.trim();
-      if (!name) return alert("Please enter your name");
+      if (!name) return alert("Scrie un nume!");
       sessionStorage.setItem("playerName", name);
+
+      // Seteaza primul jucator ca admin automat
+      if (!localStorage.getItem("gameInitialized")) {
+        isAdmin = true;
+        localStorage.setItem("admin", "true");
+        localStorage.setItem("gameInitialized", "true");
+      }
+
       if (!localStorage.getItem("players")) {
         players = [name];
-        localStorage.setItem("players", JSON.stringify(players));
-        assignRoles();
       } else {
         players = JSON.parse(localStorage.getItem("players"));
-        if (!players.includes(name)) {
-          players.push(name);
-          localStorage.setItem("players", JSON.stringify(players));
-        }
-        assignments = JSON.parse(localStorage.getItem("assignments"));
-        location = localStorage.getItem("location");
-        spy = localStorage.getItem("spy");
+        if (!players.includes(name)) players.push(name);
       }
-      showRole(name);
-    };
+      localStorage.setItem("players", JSON.stringify(players));
 
-    function assignRoles() {
+      updatePlayerLists();
+      document.getElementById("joinSection").classList.add("hidden");
+      document.getElementById("lobbySection").classList.remove("hidden");
+      if (localStorage.getItem("admin") === "true") {
+        document.getElementById("adminPanel").classList.remove("hidden");
+      }
+    }
+
+    window.startGame = function() {
       const locs = Object.keys(LOCATIONS);
       location = locs[Math.floor(Math.random() * locs.length)];
-      let roles = shuffle([...LOCATIONS[location]]);
+      let roles = [...LOCATIONS[location]];
+      players = JSON.parse(localStorage.getItem("players"));
       spy = players[Math.floor(Math.random() * players.length)];
       players.forEach(p => {
         assignments[p] = p === spy ? "SPION" : roles.pop() || "Observator";
@@ -76,11 +116,17 @@
       localStorage.setItem("assignments", JSON.stringify(assignments));
       localStorage.setItem("location", location);
       localStorage.setItem("spy", spy);
+      localStorage.setItem("gameStarted", "true");
+      showGame();
+      startTimer();
     }
 
-    function showRole(name) {
-      document.getElementById("join").style.display = "none";
-      document.getElementById("game").style.display = "block";
+    function showGame() {
+      const name = sessionStorage.getItem("playerName");
+      document.getElementById("lobbySection").classList.add("hidden");
+      document.getElementById("adminPanel").classList.add("hidden");
+      document.getElementById("gameSection").classList.remove("hidden");
+
       const role = assignments[name];
       const roleText = role === "SPION"
         ? "Tu esti SPION. Incearca sa afli locatia!"
@@ -94,6 +140,38 @@
         li.innerText = loc;
         ul.appendChild(li);
       });
+    }
+
+    function startTimer() {
+      let seconds = 600;
+      const timerEl = document.getElementById("timer");
+      const interval = setInterval(() => {
+        const min = Math.floor(seconds / 60);
+        const sec = seconds % 60;
+        timerEl.innerText = `${min}:${sec < 10 ? '0' + sec : sec}`;
+        if (seconds-- <= 0) {
+          clearInterval(interval);
+          alert("Timpul a expirat!");
+        }
+      }, 1000);
+    }
+
+    // La reincarcare: daca jocul a inceput deja, sar direct in joc
+    window.onload = () => {
+      if (localStorage.getItem("gameStarted") === "true") {
+        assignments = JSON.parse(localStorage.getItem("assignments"));
+        location = localStorage.getItem("location");
+        showGame();
+        startTimer();
+      } else if (sessionStorage.getItem("playerName")) {
+        players = JSON.parse(localStorage.getItem("players"));
+        updatePlayerLists();
+        document.getElementById("joinSection").classList.add("hidden");
+        document.getElementById("lobbySection").classList.remove("hidden");
+        if (localStorage.getItem("admin") === "true") {
+          document.getElementById("adminPanel").classList.remove("hidden");
+        }
+      }
     }
   </script>
 </body>
