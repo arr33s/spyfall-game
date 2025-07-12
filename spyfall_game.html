@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spyfall Game</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    #game, #player-view { display: none; }
+    textarea { width: 100%; height: 200px; }
+    button { padding: 10px 20px; font-size: 16px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Spyfall Game</h1>
+
+  <div id="join">
+    <p>Enter your name to join the game:</p>
+    <input type="text" id="playerName" placeholder="Your name" />
+    <button onclick="joinGame()">Join</button>
+  </div>
+
+  <div id="game">
+    <h2>Game Started!</h2>
+    <p id="yourRole"></p>
+    <h3>All Possible Locations:</h3>
+    <ul id="locationList"></ul>
+  </div>
+
+  <script type="module">
+    import LOCATIONS from './spyfall_locations.js';
+
+    let players = [];
+    let assignments = {};
+    let location = "";
+    let spy = "";
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    window.joinGame = function() {
+      const name = document.getElementById("playerName").value.trim();
+      if (!name) return alert("Please enter your name");
+      sessionStorage.setItem("playerName", name);
+      if (!localStorage.getItem("players")) {
+        players = [name];
+        localStorage.setItem("players", JSON.stringify(players));
+        assignRoles();
+      } else {
+        players = JSON.parse(localStorage.getItem("players"));
+        if (!players.includes(name)) {
+          players.push(name);
+          localStorage.setItem("players", JSON.stringify(players));
+        }
+        assignments = JSON.parse(localStorage.getItem("assignments"));
+        location = localStorage.getItem("location");
+        spy = localStorage.getItem("spy");
+      }
+      showRole(name);
+    };
+
+    function assignRoles() {
+      const locs = Object.keys(LOCATIONS);
+      location = locs[Math.floor(Math.random() * locs.length)];
+      let roles = shuffle([...LOCATIONS[location]]);
+      spy = players[Math.floor(Math.random() * players.length)];
+      players.forEach(p => {
+        assignments[p] = p === spy ? "SPION" : roles.pop() || "Observator";
+      });
+      localStorage.setItem("assignments", JSON.stringify(assignments));
+      localStorage.setItem("location", location);
+      localStorage.setItem("spy", spy);
+    }
+
+    function showRole(name) {
+      document.getElementById("join").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      const role = assignments[name];
+      const roleText = role === "SPION"
+        ? "Tu esti SPION. Incearca sa afli locatia!"
+        : `Locatia este: ${location} | Rolul tau: ${role}`;
+      document.getElementById("yourRole").innerText = roleText;
+
+      const ul = document.getElementById("locationList");
+      ul.innerHTML = "";
+      Object.keys(LOCATIONS).forEach(loc => {
+        const li = document.createElement("li");
+        li.innerText = loc;
+        ul.appendChild(li);
+      });
+    }
+  </script>
+</body>
+</html>
